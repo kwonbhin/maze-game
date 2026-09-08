@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>미로 탈출</title>
+<style>
+  :root{
+    --bg: #101216;
+    --panel: #181b21;
+    --line: #2a2e37;
+    --wall: #e9ebf0;
+    --text: #cdd1d9;
+    --text-bright: #f4f5f7;
+    --text-dim: #7b818f;
+    --accent: #e8a13b;
+    --accent-dim: #6b5227;
+    --exit: #2fb894;
+    --danger: #d1604a;
+  }
+  *{ box-sizing: border-box; }
+  html,body{
+    margin:0; padding:0; min-height:100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Pretendard", "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+  }
+  body{
+    display:flex; justify-content:center; align-items:center;
+    min-height: 100vh;
+    padding: 32px 16px 48px;
+  }
+  .wrap{
+    width: 100%;
+    max-width: 520px;
+  }
+  h1{
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-bright);
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  .subtitle{
+    font-size: 14px;
+    color: var(--text-dim);
+    margin: 0 0 20px;
+    line-height: 1.5;
+  }
+  .status-row{
+    display:flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 10px;
+    font-size: 14px;
+  }
+  .timer{
+    font-variant-numeric: tabular-nums;
+    font-size: 15px;
+    color: var(--text-bright);
+    font-weight: 600;
+  }
+  .timer.low{ color: var(--danger); }
+  .best{ color: var(--text-dim); font-size: 13px; }
+
+  .board-frame{
+    position: relative;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--panel);
+    padding: 10px;
+    margin-bottom: 16px;
+  }
+  canvas{
+    display:block;
+    width: 100%;
+    height: auto;
+    background: #0b0c0f;
+    border-radius: 2px;
+  }
+  .overlay{
+    position:absolute; inset:10px;
+    display:flex; align-items:center; justify-content:center;
+    flex-direction: column;
+    gap: 10px;
+    background: rgba(11,12,15,0.88);
+    border-radius: 2px;
+    text-align:center;
+    padding: 20px;
+  }
+  .overlay.hidden{ display:none; }
+  .overlay-title{
+    font-size: 18px; font-weight: 700; color: var(--text-bright);
+  }
+  .overlay-title.success{ color: var(--exit); }
+  .overlay-title.fail{ color: var(--danger); }
+  .overlay-desc{ font-size: 13px; color: var(--text-dim); max-width: 320px; line-height: 1.5; }
+
+  .controls{
+    display:flex; flex-wrap: nowrap; gap: 8px;
+    align-items: center;
+    margin-bottom: 18px;
+    font-size: 12px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+  select, button{
+    font-family: inherit;
+    font-size: 12px;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 5px 9px;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  select:focus-visible, button:focus-visible, label:has(input):focus-within{
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  button{
+    color: var(--text-bright);
+  }
+  button.primary{
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
+  }
+  button:hover{ border-color: var(--text-dim); }
+  .toggle{
+    display:flex; align-items:center; gap: 5px;
+    color: var(--text-dim);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .toggle input{ accent-color: var(--accent); }
+
+  .hint{
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+  }
+  .hint b{ color: var(--text); font-weight: 600; }
+  .sr-only{
+    position: absolute; width:1px; height:1px;
+    overflow:hidden; clip: rect(0,0,0,0); white-space: nowrap;
+  }
+  .hidden{ display:none !important; }
+
+  /* ---------- 타이틀 화면 ---------- */
+  #gameScreen{ display:none; }
+  .title-screen{
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--panel);
+    padding: 48px 32px 40px;
+    text-align: center;
+    display:flex; flex-direction: column; align-items:center;
+  }
+  .title-icon{ margin-bottom: 22px; opacity: 0.9; }
+  .title-heading{
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 10px;
+    background: linear-gradient(180deg, #f6c168, var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .title-desc{
+    font-size: 14px;
+    color: var(--text-dim);
+    max-width: 320px;
+    line-height: 1.6;
+    margin: 0 0 30px;
+  }
+  .title-resume{
+    font-size: 12px;
+    color: var(--exit);
+    margin: -18px 0 24px;
+  }
+  .start-btn{
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1305;
+    background: linear-gradient(180deg, #f6c168, var(--accent));
+    border: none;
+    border-radius: 6px;
+    padding: 13px 46px;
+    cursor: pointer;
+    letter-spacing: 0.01em;
+  }
+  .start-btn:hover{ filter: brightness(1.06); }
+  .start-btn:focus-visible{
+    outline: 2px solid var(--text-bright);
+    outline-offset: 3px;
+  }
+  .title-note{
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 14px;
+  }
+  .title-toggle{
+    width: 100%;
+    margin-top: 22px;
+    text-align: left;
+  }
+  .title-toggle summary{
+    font-size: 12px;
+    color: var(--text-dim);
+    cursor: pointer;
+    text-align: center;
+    list-style: none;
+  }
+  .title-toggle summary::-webkit-details-marker{ display:none; }
+  .title-toggle summary::after{ content: " ▾"; }
+  .title-toggle[open] summary::after{ content: " ▴"; }
+  .title-toggle p{
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    margin: 12px 0 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ---------- 타이틀 화면 ---------- -->
+  <div class="title-screen" id="titleScreen">
+    <svg class="title-icon" width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect x="1.5" y="1.5" width="53" height="53" rx="3" stroke="#7b818f" stroke-width="2"/>
+      <path d="M1.5 15H16M16 15V22M16 22H9M9 22V33M9 33H23M23 33V26M23 26H30M30 26V40M30 40H16M40 1.5V12M40 12H30M40 20H54.5M40 20V33M40 33H47M47 33V44M47 44H33" stroke="#7b818f" stroke-width="2"/>
+    </svg>
+    <h1 class="title-heading">미로 탈출</h1>
+    <p class="title-desc">방향키를 누르면 벽에 부딪힐 때까지 그 방향으로 쭉 미끄러져 이동합니다.<br>미로는 매번 새로 생성되지만 언제나 출구로 가는 길은 이어져 있습니다.</p>
+    <p class="title-resume hidden" id="resumeNote">이어서 진행할 기록이 있습니다.</p>
+    <button class="start-btn" id="startBtn">플레이</button>
+
+    <details class="title-toggle">
+      <summary>게임 설명 보기</summary>
+      <p>미로는 플레이를 누를 때마다 새로 생성되고, 위치·남은 시간은 새로고침하면 초기화됩니다. 다만 <b style="color:var(--text)">최고 기록과 마지막 난이도</b>는 새로고침해도 유지됩니다. 저장된 값이 없거나 손상돼 있어도 문제없이 기본값으로 시작합니다. 플레이 중 "시작화면으로"를 눌러도(새로고침이 아니라면) 위치와 남은 시간은 그대로 유지되어 다시 플레이를 누르면 이어집니다. 다른 탭으로 이동하거나 창 포커스를 벗어나면 타이머가 자동으로 멈췄다가, 돌아오면 이어서 진행됩니다.</p>
+    </details>
+  </div>
+
+  <!-- ---------- 게임 화면 ---------- -->
+  <div id="gameScreen">
+    <h1>미로 탈출</h1>
+    <p class="subtitle">방향키(↑ ↓ ← →)를 누르면 벽에 부딪힐 때까지 그 방향으로 쭉 미끄러져 이동합니다. 왼쪽 위 출발점에서 오른쪽 아래 출구까지 도착하면 성공입니다. 벽으로 막힌 길을 자동으로 뚫는 알고리즘으로 만들어서, 모든 미로는 반드시 탈출 경로가 있습니다.</p>
+
+    <div class="status-row">
+      <span class="timer" id="timerLabel">준비 중…</span>
+      <span class="best" id="bestLabel"></span>
+    </div>
+
+    <div class="board-frame">
+      <canvas id="board" width="480" height="480"></canvas>
+      <div class="overlay hidden" id="overlay">
+        <div class="overlay-title" id="overlayTitle"></div>
+        <div class="overlay-desc" id="overlayDesc"></div>
+        <button class="primary" id="overlayBtn">새 게임</button>
+      </div>
+    </div>
+
+    <div class="controls">
+      <select id="difficulty" aria-label="난이도 선택">
+        <option value="easy">쉬움 · 30초</option>
+        <option value="normal" selected>보통 · 20초</option>
+        <option value="hard">어려움 · 12초</option>
+      </select>
+      <button id="newGameBtn">새 게임</button>
+      <button id="backToTitleBtn">시작화면으로</button>
+      <label class="toggle">
+        <input type="checkbox" id="muteToggle"> 소리 끄기
+      </label>
+      <label class="toggle">
+        <input type="checkbox" id="motionToggle"> 움직임 줄이기
+      </label>
+    </div>
+
+    <div class="sr-only" aria-live="polite" id="announce"></div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- 설정 ----------
+  const MAZE_SIZE = 11; // cols = rows, 고정값 (난이도는 시간만 바꿈)
+  const DIFFICULTY = { easy: 30, normal: 20, hard: 12 };
+  const RECORD_KEY = "maze-escape-record-v1"; // "이번 판" 값이 아니라 최고 기록·선호 난이도만 저장
+  const CARDINALS = [
+    { dx:0, dy:-1, wall:"N" },
+    { dx:0, dy:1,  wall:"S" },
+    { dx:-1, dy:0, wall:"W" },
+    { dx:1, dy:0,  wall:"E" }
+  ];
+
+  const canvas = document.getElementById("board");
+  const ctx = canvas.getContext("2d");
+  const timerLabel = document.getElementById("timerLabel");
+  const bestLabel = document.getElementById("bestLabel");
+  const overlay = document.getElementById("overlay");
+  const overlayTitle = document.getElementById("overlayTitle");
+  const overlayDesc = document.getElementById("overlayDesc");
+  const overlayBtn = document.getElementById("overlayBtn");
+  const difficultySel = document.getElementById("difficulty");
+  const newGameBtn = document.getElementById("newGameBtn");
+  const muteToggle = document.getElementById("muteToggle");
+  const motionToggle = document.getElementById("motionToggle");
+  const announce = document.getElementById("announce");
+  const titleScreen = document.getElementById("titleScreen");
+  const gameScreen = document.getElementById("gameScreen");
+  const startBtn = document.getElementById("startBtn");
+  const resumeNote = document.getElementById("resumeNote");
+  const backToTitleBtn = document.getElementById("backToTitleBtn");
+
+  // ---------- 상태 ----------
+  let state = {
+    seed: 1,
+    difficultyKey: "normal",
+    timeLimit: DIFFICULTY.normal,
+    remaining: DIFFICULTY.normal,
+    px: 0, py: 0,
+    status: "idle", // idle | playing | success | fail
+    bestTime: null
+  };
+  let maze = null;
+  let rafId = null;
+  let lastTick = null;
+  let audioCtx = null;
+  let viewingGame = false;
+
+  // ---------- 시드 난수 ----------
+  function mulberry32(a){
+    return function(){
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // ---------- 미로 생성 (재귀 백트래커, 항상 탈출 가능) ----------
+  function generateMaze(size, seed){
+    const rng = mulberry32(seed);
+    const cells = [];
+    for (let y = 0; y < size; y++){
+      const row = [];
+      for (let x = 0; x < size; x++){
+        row.push({ N:true, S:true, E:true, W:true, visited:false });
+      }
+      cells.push(row);
+    }
+    const opposite = { N:"S", S:"N", E:"W", W:"E" };
+    const stack = [{x:0,y:0}];
+    cells[0][0].visited = true;
+    while (stack.length){
+      const cur = stack[stack.length-1];
+      const {x,y} = cur;
+      const neighbors = [];
+      if (y > 0 && !cells[y-1][x].visited) neighbors.push({x, y:y-1, dir:"N"});
+      if (y < size-1 && !cells[y+1][x].visited) neighbors.push({x, y:y+1, dir:"S"});
+      if (x < size-1 && !cells[y][x+1].visited) neighbors.push({x:x+1, y, dir:"E"});
+      if (x > 0 && !cells[y][x-1].visited) neighbors.push({x:x-1, y, dir:"W"});
+      if (neighbors.length === 0){ stack.pop(); continue; }
+      const next = neighbors[Math.floor(rng() * neighbors.length)];
+      cells[y][x][next.dir] = false;
+      cells[next.y][next.x][opposite[next.dir]] = false;
+      cells[next.y][next.x].visited = true;
+      stack.push({x: next.x, y: next.y});
+    }
+    return cells;
+  }
+
+  // 슬라이드 이동 기준으로 해당 방향 끝까지 이동했을 때 도착하는 좌표 계산 (검증용)
+  function slideFrom(cells, size, x, y, dir){
+    let moved = false;
+    while (true){
+      const cell = cells[y][x];
+      if (cell[dir.wall]) break;
+      x += dir.dx; y += dir.dy;
+      moved = true;
+      if (x === size - 1 && y === size - 1) break;
+    }
+    return { x, y, moved };
+  }
+
+  // 슬라이드 이동만으로 출구에 도달 가능한지 확인한다.
+  // 한 칸 이동과 달리 슬라이드는 갈림길 중간에서 멈출 수 없어 항상 보장되지 않으므로 직접 검증한다.
+  function isSolvableBySlide(cells, size){
+    const seen = new Set(["0,0"]);
+    const queue = [[0,0]];
+    while (queue.length){
+      const [x,y] = queue.shift();
+      if (x === size - 1 && y === size - 1) return true;
+      for (const dir of CARDINALS){
+        const res = slideFrom(cells, size, x, y, dir);
+        const key = res.x + "," + res.y;
+        if (res.moved && !seen.has(key)){
+          seen.add(key);
+          queue.push([res.x, res.y]);
+        }
+      }
+    }
+    return false;
+  }
+
+  // 슬라이드 이동으로 반드시 풀 수 있는 미로가 나올 때까지 시드를 바꿔가며 생성한다.
+  function generateSolvableMaze(size, baseSeed){
+    let seed = baseSeed;
+    for (let attempt = 0; attempt < 500; attempt++){
+      const cells = generateMaze(size, seed);
+      if (isSolvableBySlide(cells, size)) return { cells, seed };
+      seed = (seed + 104729) >>> 0; // 다음 시도용 시드
+    }
+    return { cells: generateMaze(size, baseSeed), seed: baseSeed }; // 극히 드문 경우 대비
+  }
+
+  // ---------- 오디오 (정해진 사건에서만 재생) ----------
+  function playTone(freq, dur){
+    if (muteToggle.checked) return;
+    try{
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.frequency.value = freq;
+      osc.type = "sine";
+      gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + dur);
+    } catch(e){ /* 오디오 미지원 환경은 조용히 무시 */ }
+  }
+
+  // ---------- 최고 기록 저장 / 복구 ----------
+  // "이번 판" 상태(위치·남은시간)와 달리, 최고 기록과 선호 난이도는 재접속·새로고침 후에도 유지한다.
+  async function loadRecord(){
+    try{
+      const result = await window.storage.get(RECORD_KEY, false);
+      if (!result || !result.value) return null; // 저장값 없음 → 기본값으로 시작
+      const parsed = JSON.parse(result.value);
+      const bestOk = parsed.bestTime === null ||
+        (typeof parsed.bestTime === "number" && isFinite(parsed.bestTime) && parsed.bestTime > 0);
+      if (!bestOk || !(parsed.difficultyKey in DIFFICULTY)) return null; // 형식이 깨짐 → 기본값으로 시작
+      return parsed;
+    } catch(e){
+      return null; // 손상된 저장값 → 기본값으로 대체 (게임은 계속 정상 시작)
+    }
+  }
+
+  async function saveRecord(){
+    try{
+      await window.storage.set(RECORD_KEY, JSON.stringify({
+        bestTime: state.bestTime,
+        difficultyKey: state.difficultyKey
+      }), false);
+    } catch(e){ /* 저장 실패는 다음 저장 시점에 다시 시도 */ }
+  }
+
+  async function initRecord(){
+    const rec = await loadRecord();
+    if (rec && !maze){ // 로딩 중 이미 플레이가 시작됐다면 덮어쓰지 않는다
+      state.bestTime = rec.bestTime;
+      state.difficultyKey = rec.difficultyKey;
+      state.timeLimit = DIFFICULTY[rec.difficultyKey];
+      state.remaining = state.timeLimit;
+      difficultySel.value = rec.difficultyKey;
+      updateTimerLabel();
+    } else if (rec && maze){
+      state.bestTime = rec.bestTime; // 최고 기록만 반영, 진행 중인 판은 그대로 둠
+      updateTimerLabel();
+    }
+  }
+
+  // ---------- 게임 시작 (항상 새 미로, 슬라이드로 풀 수 있음이 검증된 미로만 사용) ----------
+  function newGame(difficultyKey, keepSeed){
+    const timeLimit = DIFFICULTY[difficultyKey];
+    const baseSeed = keepSeed || Math.floor(Math.random() * 1e9);
+    const { cells, seed } = generateSolvableMaze(MAZE_SIZE, baseSeed);
+    state = {
+      seed,
+      difficultyKey,
+      timeLimit,
+      remaining: timeLimit,
+      px: 0, py: 0,
+      status: "idle",
+      bestTime: state.bestTime
+    };
+    maze = cells;
+    hideOverlay();
+    render();
+    updateTimerLabel();
+  }
+
+  // 플레이 화면 진입: 이 페이지에서 이미 플레이한 적이 있으면 그 상태 그대로 이어서 보여주고,
+  // 페이지에 처음 들어와 최초로 플레이 화면에 들어가는 경우에만 새 미로를 만든다.
+  function enterGame(){
+    if (viewingGame) return;
+    viewingGame = true;
+    titleScreen.classList.add("hidden");
+    titleScreen.style.display = "none";
+    gameScreen.style.display = "block";
+
+    if (!maze){
+      newGame(difficultySel.value, null);
+    }
+    resizeCanvas();
+    render();
+    updateTimerLabel();
+    if (state.status === "playing"){
+      lastTick = performance.now(); // 타이틀 화면에 머문 시간은 계산에서 제외
+      rafId = requestAnimationFrame(loop);
+    }
+  }
+
+  // 시작 화면으로 돌아가기: 진행 중인 게임은 그대로 메모리에 남기고 화면만 전환한다 (리셋 없음).
+  function backToTitle(){
+    viewingGame = false;
+    if (rafId){ cancelAnimationFrame(rafId); rafId = null; }
+    gameScreen.style.display = "none";
+    titleScreen.classList.remove("hidden");
+    titleScreen.style.display = "";
+    resumeNote.classList.toggle("hidden", !maze);
+  }
+
+  // ---------- 렌더링 ----------
+  function resizeCanvas(){
+    const dpr = window.devicePixelRatio || 1;
+    const cssSize = canvas.parentElement.clientWidth - 20; // padding 보정
+    canvas.style.width = cssSize + "px";
+    canvas.style.height = cssSize + "px";
+    canvas.width = Math.round(cssSize * dpr);
+    canvas.height = Math.round(cssSize * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    render();
+  }
+
+  let bumpUntil = 0; // 벽에 막힌 순간에만 짧게 켜지는 플래시 (사건 기반 효과)
+  function render(){
+    if (!maze) return;
+    const size = canvas.width / (window.devicePixelRatio || 1);
+    const cs = size / MAZE_SIZE;
+
+    ctx.clearRect(0, 0, size, size);
+
+    // 출구 타일 — 항상 같은 밝기로 표시 (반복 애니메이션 없음)
+    const exitX = (MAZE_SIZE - 1) * cs;
+    const exitY = (MAZE_SIZE - 1) * cs;
+    ctx.fillStyle = "rgba(47,184,148,0.32)";
+    ctx.fillRect(exitX + 2, exitY + 2, cs - 4, cs - 4);
+
+    // 벽
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--wall").trim();
+    ctx.lineWidth = Math.max(2, cs * 0.06);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    for (let y = 0; y < MAZE_SIZE; y++){
+      for (let x = 0; x < MAZE_SIZE; x++){
+        const cell = maze[y][x];
+        const px0 = x * cs, py0 = y * cs;
+        if (cell.N){ ctx.moveTo(px0, py0); ctx.lineTo(px0 + cs, py0); }
+        if (cell.W){ ctx.moveTo(px0, py0); ctx.lineTo(px0, py0 + cs); }
+        if (y === MAZE_SIZE - 1 && cell.S){ ctx.moveTo(px0, py0 + cs); ctx.lineTo(px0 + cs, py0 + cs); }
+        if (x === MAZE_SIZE - 1 && cell.E){ ctx.moveTo(px0 + cs, py0); ctx.lineTo(px0 + cs, py0 + cs); }
+      }
+    }
+    ctx.stroke();
+
+    // 플레이어
+    const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+    ctx.fillStyle = accent;
+    const cx = state.px * cs + cs / 2;
+    const cy = state.py * cs + cs / 2;
+    const r = cs * 0.28;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 벽에 막힌 사건이 발생했을 때만, 짧은 시간 동안만 테두리를 붉게 표시
+    if (!motionToggle.checked && performance.now() < bumpUntil){
+      ctx.strokeStyle = "rgba(209,96,74,0.8)";
+      ctx.lineWidth = Math.max(3, cs * 0.12);
+      ctx.strokeRect(ctx.lineWidth/2, ctx.lineWidth/2, size - ctx.lineWidth, size - ctx.lineWidth);
+    }
+  }
+
+  // ---------- 시간/루프 ----------
+  function updateTimerLabel(){
+    const secs = Math.max(0, Math.ceil(state.remaining));
+    timerLabel.textContent = state.status === "idle"
+      ? `남은 시간 ${secs}초 · 방향키를 누르면 시작합니다`
+      : `남은 시간 ${secs}초`;
+    timerLabel.classList.toggle("low", secs <= 10 && state.status === "playing");
+    bestLabel.textContent = state.bestTime != null
+      ? `최고 기록 ${state.bestTime.toFixed(1)}초`
+      : "";
+  }
+
+  function loop(now){
+    if (state.status !== "playing"){ rafId = null; return; }
+    if (lastTick == null) lastTick = now;
+    const dt = (now - lastTick) / 1000;
+    lastTick = now;
+    state.remaining -= dt;
+
+    if (state.remaining <= 0){
+      state.remaining = 0;
+      finish("fail");
+      return;
+    }
+    updateTimerLabel();
+    render();
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function startIfIdle(){
+    if (state.status === "idle"){
+      state.status = "playing";
+      lastTick = performance.now();
+      rafId = requestAnimationFrame(loop);
+    }
+  }
+
+  function finish(result){
+    state.status = result;
+    if (rafId){ cancelAnimationFrame(rafId); rafId = null; }
+    if (result === "success"){
+      const elapsed = state.timeLimit - state.remaining;
+      if (state.bestTime == null || elapsed < state.bestTime){
+        state.bestTime = elapsed;
+        saveRecord(); // 새 최고 기록은 재접속 후에도 남도록 저장
+      }
+      playTone(880, 0.35);
+      showOverlay("success", "탈출 성공", `${elapsed.toFixed(1)}초 만에 출구에 도착했습니다.`);
+      announce.textContent = "탈출에 성공했습니다.";
+    } else {
+      playTone(160, 0.4);
+      showOverlay("fail", "시간 종료", "제한 시간 안에 출구에 도착하지 못했습니다.");
+      announce.textContent = "제한 시간이 종료되었습니다.";
+    }
+    updateTimerLabel();
+  }
+
+  function showOverlay(kind, title, desc){
+    overlay.classList.remove("hidden");
+    overlayTitle.textContent = title;
+    overlayTitle.className = "overlay-title " + kind;
+    overlayDesc.textContent = desc;
+  }
+  function hideOverlay(){ overlay.classList.add("hidden"); }
+
+  // 벽에 막힌 사건 전용 효과: 정해진 시간 동안만 재생되고 스스로 멈춘다 (반복되지 않음)
+  function triggerBump(){
+    playTone(220, 0.12);
+    if (motionToggle.checked) return; // 움직임 줄이기 — 시각 효과는 아예 재생하지 않음
+    bumpUntil = performance.now() + 180;
+    if (!rafId){ // 메인 루프가 이미 매 프레임 그리고 있지 않을 때만 전용 루프를 짧게 돌림
+      requestAnimationFrame(bumpTick);
+    }
+  }
+  function bumpTick(now){
+    render();
+    if (now < bumpUntil && !rafId){
+      requestAnimationFrame(bumpTick);
+    }
+  }
+
+  // ---------- 입력 ----------
+  const DIRS = {
+    ArrowUp:    { dx:0, dy:-1, wall:"N" },
+    ArrowDown:  { dx:0, dy:1,  wall:"S" },
+    ArrowLeft:  { dx:-1, dy:0, wall:"W" },
+    ArrowRight: { dx:1, dy:0,  wall:"E" }
+  };
+
+  window.addEventListener("keydown", (e) => {
+    const dir = DIRS[e.key];
+    if (!dir) return;
+    e.preventDefault(); // 페이지 스크롤 방지
+    if (!viewingGame || !maze) return; // 타이틀 화면에서는 무시
+    if (state.status === "success" || state.status === "fail") return;
+
+    const startCell = maze[state.py][state.px];
+    if (startCell[dir.wall]) {
+      triggerBump(); // 그 방향으로 한 칸도 못 감 — 이 사건에서만 짧은 플래시/소리 재생
+      return; // 위치·시간 등 게임 상태는 변화 없음
+    }
+
+    startIfIdle();
+    if (state.status !== "playing") return;
+
+    // 벽에 닿을 때까지(또는 출구에 도착할 때까지) 같은 방향으로 계속 이동
+    while (true){
+      const cell = maze[state.py][state.px];
+      if (cell[dir.wall]) break;
+      state.px += dir.dx;
+      state.py += dir.dy;
+      if (state.px === MAZE_SIZE - 1 && state.py === MAZE_SIZE - 1) break;
+    }
+    render();
+
+    if (state.px === MAZE_SIZE - 1 && state.py === MAZE_SIZE - 1){
+      finish("success");
+    }
+  }, { passive:false });
+
+  // ---------- 포커스 이탈 / 복귀 ----------
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden){
+      if (rafId){ cancelAnimationFrame(rafId); rafId = null; }
+    } else if (viewingGame && state.status === "playing" && rafId == null){
+      lastTick = performance.now();
+      rafId = requestAnimationFrame(loop);
+    }
+  });
+
+  // ---------- 창 크기 변경 ----------
+  window.addEventListener("resize", resizeCanvas);
+
+  // ---------- 버튼 / 옵션 ----------
+  newGameBtn.addEventListener("click", () => newGame(difficultySel.value, null));
+  overlayBtn.addEventListener("click", () => newGame(difficultySel.value, null));
+  difficultySel.addEventListener("change", () => {
+    newGame(difficultySel.value, null);
+    saveRecord(); // 선택한 난이도도 재접속 후 유지되도록 저장
+  });
+  startBtn.addEventListener("click", enterGame);
+  backToTitleBtn.addEventListener("click", backToTitle);
+
+  initRecord(); // 최고 기록·선호 난이도 불러오기 (없거나 손상돼도 기본값으로 계속 진행)
+})();
+</script>
+</body>
+</html>
